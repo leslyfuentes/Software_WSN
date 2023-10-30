@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa de Estaciones de Carga</title>
+    <style>
+        #map {
+            height: 400px;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Mapa de Estaciones de Carga</h1>
+    <div id="loading-message">Cargando...</div>
+    <div id="map"></div>
+
+
+    <script>
+        // Inicializar el mapa
+        function initMap() {
+            var flag = true
+            var map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 12 // Nivel de zoom inicial
+            });
+
+            var autoMarker = null; // Variable para almacenar el marcador del auto
+            var estacionesDeCargaMarkers = []; // Almacena los marcadores de estaciones de carga
+            var loadingMessage = document.getElementById('loading-message'); // Elemento del mensaje de carga
+            loadingMessage.style.display = 'block';
+            directionsRenderer = new google.maps.DirectionsRenderer({
+                suppressMarkers: true
+            });
+            directionsRenderer.setMap(map);
+            var estacionSeleccionadaPos = null;
+            function actualizarDatos() {
+
+                // Obtener la posición del auto desde el backend (usando fetch)
+                fetch('http://localhost:3001/gps-position')
+                    .then(response => response.json())
+                    .then(data => {
+                        var autoPosicion = new google.maps.LatLng(data.latitude, data.longitude);
+
+                        // Actualizar el marcador del auto en el mapa
+                        if (autoMarker) {
+                            autoMarker.setPosition(autoPosicion);
+                        } else {
+                            autoMarker = new google.maps.Marker({
+                                position: autoPosicion,
+                                map: map,
+                                title: 'Posición del Auto'
+                            });
+                        }
+
+                        // Centrar el mapa en la posición del auto
+                        if (flag) {
+                            map.setCenter(autoPosicion);
+                            flag = false
+                        }
+                        agregarMarcadoresEstacionesCarga();
+
+                        loadingMessage.style.display = 'none';
+                        if (estacionSeleccionadaPos) {
+                            calcularYMostrarRuta(autoPosicion, estacionSeleccionadaPos);
+                        }
+                    })
+                    .catch(error => console.error('Error al obtener la posición del auto:', error));
+            }
+
+            // Crear marcadores de estaciones de carga y configurar evento de clic
+            function agregarMarcadoresEstacionesCarga() {
+                // Obtener las ubicaciones de las estaciones de carga desde el backend (usando fetch)
+                fetch('http://localhost:3001/button-State')
+                    .then(response => response.json())
+                    .then(estaciones => {
+                        estaciones.forEach(estacion => {
+                            var estacionPosicion = new google.maps.LatLng(estacion.latitude, estacion.longotude);
+                            var estacionMarker = new google.maps.Marker({
+                                position: estacionPosicion,
+                                map: map,
+                                title: 'Estación de Carga'
+                            });
+
+                            // Agregar evento de clic al marcador de la estación de carga
+                            estacionMarker.addListener('click', function () {
+                                // Calcular y mostrar la ruta desde el auto a esta estación de carga
+                                calcularYMostrarRuta(autoMarker.getPosition(), estacionPosicion);
+                                estacionSeleccionadaPos = estacionPosicion;
+                            });
+
+                            // Configurar el ícono del marcador según el estado de la estación
+                            if (estacion.used) {
+                                estacionMarker.setIcon('https://firebasestorage.googleapis.com/v0/b/memoria-9bc6e.appspot.com/o/red-station.png?alt=media&token=7c5fa669-85b2-414f-92ad-a45d7e878492&_gl=1*16ag8rk*_ga*MjgxMTgwNzcwLjE2OTI4NTEyNjk.*_ga_CW55HF8NVT*MTY5ODY4MjExNi42MS4xLjE2OTg2ODIxMzMuNDMuMC4w');
+                            } else {
+                                estacionMarker.setIcon('https://firebasestorage.googleapis.com/v0/b/memoria-9bc6e.appspot.com/o/green-station.png?alt=media&token=e2ba59d0-3a91-4478-a8fb-bf046b07c089&_gl=1*1fin0y3*_ga*MjgxMTgwNzcwLjE2OTI4NTEyNjk.*_ga_CW55HF8NVT*MTY5ODY4MjExNi42MS4xLjE2OTg2ODI5OTQuMzYuMC4w');
+                            }
+
+                            // Agregar el marcador al array para su posterior referencia
+                            estacionesDeCargaMarkers.push(estacionMarker);
+                        });
+                    })
+                    .catch(error => console.error('Error al obtener las estaciones de carga:', error));
+            }
+
+            // Calcular y mostrar la ruta en el mapa
+            function calcularYMostrarRuta(origen, destino) {
+                var directionsService = new google.maps.DirectionsService();
+
+                // Borrar la ruta anterior si existe
+
+
+                // Borrar la ruta anterior si existe
+
+
+                var request = {
+                    origin: origen,
+                    destination: destino,
+                    travelMode: 'DRIVING',
+                };
+
+                // Calcular la nueva ruta
+                directionsService.route(request, function (result, status) {
+                    if (status === 'OK') {
+                        directionsRenderer.setDirections(result);
+                    } else {
+                        console.error('Error al calcular la ruta:', status);
+                    }
+                });
+                // directionsRenderer.setDirections({ routes: [] });s
+            }
+
+            // Llamar a las funciones para agregar marcadores de estaciones de carga y actualizar datos
+            setInterval(actualizarDatos, 5000);
+        }
+    </script>
+
+    <!-- Incluir la API de Google Maps -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAbwRP_SV_kUnIfs6FeWgNv7nGbBGOHll0&callback=initMap"
+        async defer></script>
+</body>
+
+</html>
